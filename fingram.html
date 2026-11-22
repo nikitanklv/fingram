@@ -1,0 +1,1206 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#0f0f1e">
+<title>Жизнь на зарплату — финансовый симулятор</title>
+<style>
+  :root {
+    --bg: #0f0f1e; --card: #1a1a2e; --border: #2d2d4a;
+    --text: #e4e4e7; --muted: #8b8b9e;
+    --green: #22c55e; --red: #ef4444; --yellow: #f59e0b;
+    --blue: #3b82f6; --purple: #8b5cf6; --pink: #ec4899;
+    --cyan: #06b6d4;
+  }
+  html { -webkit-text-size-adjust: 100%; overflow-x: hidden; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, 'Segoe UI', Roboto, sans-serif;
+    background: radial-gradient(ellipse at top, #1a1a35 0%, #0f0f1e 70%);
+    color: var(--text); min-height: 100vh; min-height: 100dvh;
+    padding: 16px; padding-bottom: calc(20px + env(safe-area-inset-bottom));
+    display: flex; justify-content: center; line-height: 1.5;
+    overflow-x: hidden; -webkit-tap-highlight-color: transparent;
+  }
+  .container { max-width: 780px; width: 100%; padding-bottom: 40px; }
+  .card {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 16px; padding: 20px; margin-bottom: 16px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+  }
+  h1 { font-size: 26px; margin-bottom: 8px; }
+  h2 { font-size: 18px; margin-bottom: 12px; }
+  .muted { color: var(--muted); }
+  .month-header {
+    display: flex; justify-content: space-between; align-items: center;
+    gap: 10px; margin-bottom: 14px; flex-wrap: wrap;
+  }
+  .month-badge {
+    background: var(--purple); padding: 5px 14px; border-radius: 20px;
+    font-size: 13px; font-weight: 700; flex-shrink: 0;
+  }
+  .progress-bar {
+    height: 5px; background: var(--border); border-radius: 3px;
+    margin-bottom: 18px; overflow: hidden;
+  }
+  .progress-fill {
+    height: 100%; background: linear-gradient(90deg, var(--purple), var(--blue));
+    transition: width 0.4s ease;
+  }
+  .status-grid { 
+    display: grid; 
+    grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); 
+    gap: 8px; 
+  }
+  .status-item {
+    background: rgba(255,255,255,0.03); padding: 10px 12px;
+    border-radius: 10px; border: 1px solid var(--border);
+  }
+  .status-label {
+    font-size: 11px; color: var(--muted); margin-bottom: 4px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .status-value { font-size: 16px; font-weight: 700; white-space: nowrap; }
+  .value-green { color: var(--green); }
+  .value-red { color: var(--red); }
+  .value-yellow { color: var(--yellow); }
+  .value-blue { color: var(--blue); }
+  .value-pink { color: var(--pink); }
+
+  button {
+    font-family: inherit; font-size: 15px; padding: 14px 20px;
+    border: none; border-radius: 10px; cursor: pointer; font-weight: 600;
+    transition: transform 0.15s, filter 0.15s;
+    background: var(--blue); color: white;
+    min-height: 48px; touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+  }
+  button:disabled { opacity: 0.4; cursor: not-allowed; }
+  button.secondary { background: var(--border); color: var(--text); }
+  button.danger { background: var(--red); }
+  button.success { background: var(--green); }
+  button.warning { background: var(--yellow); color: #1a1a2e; }
+  @media (hover: hover) {
+    button:hover:not(:disabled) { transform: translateY(-1px); filter: brightness(1.1); }
+  }
+
+  #page { position: relative; }
+  #page-content { display: flex; flex-direction: column; gap: 10px; }
+  .feed-card {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 14px; padding: 16px;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.25); position: relative;
+  }
+  .feed-card.log {
+    padding: 10px 16px 10px 14px; font-size: 13px;
+    font-family: 'SF Mono', Consolas, monospace;
+    border-left: 3px solid var(--border);
+    word-break: break-word; overflow-wrap: anywhere;
+  }
+  .feed-card.log.positive { border-left-color: var(--green); }
+  .feed-card.log.negative { border-left-color: var(--red); }
+  .feed-card.log.warning  { border-left-color: var(--yellow); }
+  .feed-card.log.covered  { border-left-color: var(--blue); }
+  .feed-card.log.neutral  { border-left-color: var(--muted); }
+
+  .feed-card.event {
+    background: linear-gradient(135deg, rgba(239,68,68,0.13) 0%, rgba(239,68,68,0.04) 100%);
+    border-color: rgba(239,68,68,0.4);
+    transition: background 0.4s, border-color 0.4s;
+  }
+  .feed-card.event.paid {
+    background: linear-gradient(135deg, rgba(34,197,94,0.1) 0%, rgba(34,197,94,0.03) 100%);
+    border-color: rgba(34,197,94,0.35);
+  }
+  .feed-card.event.scenario {
+    background: linear-gradient(135deg, rgba(6,182,212,0.13) 0%, rgba(6,182,212,0.04) 100%);
+    border-color: rgba(6,182,212,0.4);
+  }
+  .feed-card.quiz {
+    background: linear-gradient(135deg, rgba(59,130,246,0.13) 0%, rgba(59,130,246,0.04) 100%);
+    border-color: rgba(59,130,246,0.4);
+  }
+  .feed-card.tax {
+    background: linear-gradient(135deg, rgba(34,197,94,0.13) 0%, rgba(34,197,94,0.04) 100%);
+    border-color: rgba(34,197,94,0.4);
+  }
+  .feed-card.temptation {
+    background: linear-gradient(135deg, rgba(139,92,246,0.13) 0%, rgba(139,92,246,0.04) 100%);
+    border-color: rgba(139,92,246,0.4);
+  }
+
+  .event-emoji { font-size: clamp(32px, 8vw, 40px); margin-bottom: 4px; line-height: 1; }
+  .event-title { font-size: 17px; font-weight: 600; margin-bottom: 4px; }
+  .event-text { font-size: 14px; line-height: 1.55; margin-bottom: 12px; color: #d0d0d8; }
+  .event-cost { font-size: clamp(22px, 6vw, 24px); font-weight: 800; color: var(--red); }
+  .event-paid-badge {
+    display: inline-block; background: var(--green); color: white;
+    padding: 5px 12px; border-radius: 20px; font-size: 12px; font-weight: 700;
+    margin-top: 10px;
+  }
+  .result-box {
+    padding: 12px 14px; border-radius: 10px; margin-top: 12px;
+    font-size: 14px; line-height: 1.5;
+  }
+  .result-box.good { background: rgba(34,197,94,0.15); border: 1px solid rgba(34,197,94,0.35); }
+  .result-box.bad  { background: rgba(239,68,68,0.15); border: 1px solid rgba(239,68,68,0.35); }
+  .result-box.info { background: rgba(59,130,246,0.13); border: 1px solid rgba(59,130,246,0.35); }
+
+  .insurance-toggle {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 12px; padding: 16px;
+    background: rgba(59,130,246,0.1);
+    border: 1px solid rgba(59,130,246,0.3);
+    border-radius: 12px; cursor: pointer; user-select: none;
+    -webkit-user-select: none;
+    transition: background 0.15s, border-color 0.15s;
+    touch-action: manipulation; -webkit-tap-highlight-color: transparent;
+  }
+  .insurance-toggle.active {
+    background: rgba(34,197,94,0.15); border-color: rgba(34,197,94,0.4);
+  }
+  @media (hover: hover) {
+    .insurance-toggle:hover { background: rgba(59,130,246,0.15); }
+    .insurance-toggle.active:hover { background: rgba(34,197,94,0.2); }
+  }
+  .checkbox {
+    width: 26px; height: 26px; border-radius: 7px; border: 2px solid var(--muted);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 16px; font-weight: 700; flex-shrink: 0;
+  }
+  .insurance-toggle.active .checkbox {
+    background: var(--green); border-color: var(--green); color: white;
+  }
+
+  .result-row {
+    display: flex; justify-content: space-between; gap: 12px;
+    padding: 10px 0; border-bottom: 1px solid var(--border); font-size: 15px;
+  }
+  .result-row:last-child { border-bottom: none; }
+  .result-row.total {
+    font-size: 18px; font-weight: 700; padding-top: 16px;
+    margin-top: 8px; border-top: 2px solid var(--border);
+  }
+  .grade {
+    text-align: center; padding: 24px 16px; margin: 8px 0 20px;
+    border-radius: 16px;
+    background: linear-gradient(135deg, var(--purple) 0%, var(--blue) 100%);
+  }
+  .grade-emoji { font-size: clamp(48px, 14vw, 64px); margin-bottom: 8px; line-height: 1; }
+  .grade-text { font-size: clamp(20px, 6vw, 24px); font-weight: 800; margin-bottom: 4px; }
+  .grade-sub { opacity: 0.9; font-size: 14px; }
+  .tip {
+    background: rgba(139,92,246,0.1); border-left: 3px solid var(--purple);
+    padding: 14px 16px; border-radius: 8px; margin-top: 14px;
+    font-size: 14px; line-height: 1.65;
+  }
+
+  @keyframes cardSlideIn {
+    from { opacity: 0; transform: translateX(60px); }
+    to   { opacity: 1; transform: translateX(0); }
+  }
+  @keyframes pageEnterUp {
+    from { opacity: 0; transform: translateY(60px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes pageExitUp {
+    from { opacity: 1; transform: translateY(0); }
+    to   { opacity: 0; transform: translateY(-60px); }
+  }
+  @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+  .slide-from-right {
+    animation: cardSlideIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
+    will-change: transform, opacity;
+  }
+  #page-content.page-enter {
+    animation: pageEnterUp 0.55s cubic-bezier(0.16, 1, 0.3, 1) both;
+    will-change: transform, opacity;
+  }
+  #page-content.page-exit {
+    animation: pageExitUp 0.35s ease-in both; pointer-events: none;
+    will-change: transform, opacity;
+  }
+  .fade-in { animation: fadeIn 0.35s ease-out; }
+
+  @media (max-width: 600px) {
+    .card { padding: 18px 16px; }
+    .feed-card { padding: 14px; }
+    .feed-card.log { padding: 10px 14px 10px 12px; }
+    .result-row { font-size: 14px; }
+    .result-row.total { font-size: 16px; }
+  }
+  @media (max-width: 500px) {
+    body { padding: 12px; padding-bottom: calc(16px + env(safe-area-inset-bottom)); }
+    .status-grid { grid-template-columns: repeat(2, 1fr); }
+    .status-value { font-size: 15px; }
+    h1 { font-size: 22px; }
+    h2 { font-size: 16px; }
+    button { font-size: 14px; padding: 13px 16px; }
+  }
+  @media (max-width: 360px) {
+    body { padding: 10px; padding-bottom: calc(14px + env(safe-area-inset-bottom)); }
+    .card { padding: 16px 14px; }
+    .status-item { padding: 10px 12px; }
+    .status-value { font-size: 14px; }
+    .status-label { font-size: 10px; }
+    .result-row { font-size: 13px; }
+  }
+</style>
+</head>
+<body>
+<div class="container" id="app"></div>
+
+<script>
+const CONFIG = {
+  totalMonths: 12,
+  salaryGross: 30000,
+  ndfl: 0.13,
+  living: 17000,
+  insuranceCost: 1500,
+  insuranceCoverage: 0.70,
+  creditLimit: 50000,
+  creditRate: 0.03,
+  microloanRate: 0.30,
+  quizBonus: 500,
+  moodStart: 65,
+};
+
+const RISK_EVENTS = [
+  { emoji: "📱", name: "Сломался телефон", cost: 9000, insurable: true },
+  { emoji: "💻", name: "Сломался ноутбук", cost: 15000, insurable: true },
+  { emoji: "💧", name: "Затопили соседи — ремонт", cost: 18000, insurable: true },
+  { emoji: "🦷", name: "Заболел зуб — лечение", cost: 12000, insurable: true },
+  { emoji: "❄️", name: "Сломался холодильник", cost: 14000, insurable: true },
+  { emoji: "🚗", name: "Мелкое ДТП — ремонт", cost: 16000, insurable: true },
+  { emoji: "🛁", name: "Прорвало трубу в квартире", cost: 12000, insurable: true },
+  { emoji: "💊", name: "Простуда — лекарства и врач", cost: 4000, insurable: true },
+  { emoji: "🧥", name: "Порвал зимнюю куртку", cost: 7000, insurable: true },
+  { emoji: "🖥️", name: "Разбил экран монитора", cost: 8000, insurable: true },
+  { emoji: "🚔", name: "Штраф за превышение скорости", cost: 5000, insurable: false },
+  { emoji: "🎂", name: "Подарок другу на день рождения", cost: 3000, insurable: false },
+  { emoji: "👟", name: "Порвались кроссовки", cost: 5000, insurable: false },
+  { emoji: "📚", name: "Срочно нужны учебники", cost: 3000, insurable: false },
+  { emoji: "🚗", name: "Нужно купить зимнюю резину", cost: 15000, insurable: false },
+];
+
+const SCENARIO_EVENTS = [
+  // ===== МОШЕННИКИ (за разоблачение денег не даём — только избегаешь потери) =====
+  {
+    emoji: "📱", name: "СМС «ваша карта заблокирована»",
+    text: "«Ваша карта заблокирована. Для разблокировки перейдите по ссылке: sberbank-verify-secure.ru»",
+    isScam: true,
+    options: [
+      { text: "Перейти по ссылке и ввести данные", outcome: { cash: -15000, msg: "Мошенники получили доступ к карте. Настоящий банк никогда не просит переходить по ссылкам из СМС.", type: "bad" } },
+      { text: "Открыть официальное приложение банка", outcome: { cash: 0, msg: "Верно! Карта в порядке — это подделка. Официальное приложение — единственный безопасный способ проверки.", type: "good" } },
+      { text: "Удалить СМС и забыть", outcome: { cash: 0, msg: "Неплохо, но лучше было проверить в приложении.", type: "info" } },
+    ]
+  },
+  {
+    emoji: "📞", name: "Звонок «службы безопасности»",
+    text: "«Подозрительная операция по вашей карте. Продиктуйте код из СМС, чтобы отменить перевод»",
+    isScam: true,
+    options: [
+      { text: "Продиктовать код", outcome: { cash: -20000, msg: "Мошенники оформили на тебя кредит. Банк НИКОГДА не спрашивает коды из СМС по телефону!", type: "bad" } },
+      { text: "Сбросить и позвонить в банк самому", outcome: { cash: 0, msg: "Молодец! Ты перезвонил в банк по официальному номеру — это единственный безопасный способ проверить.", type: "good" } },
+      { text: "Слушать дальше и уточнять", outcome: { cash: -20000, msg: "Мошенники хорошо подготовлены. Правильный ответ — сброс и звонок в банк по номеру с карты.", type: "bad" } },
+    ]
+  },
+  {
+    emoji: "💬", name: "«Друг» просит в долг",
+    text: "«Срочно нужны 5000 ₽ до завтра, скинь на карту 2202...» — сообщение в Telegram от «Андрея»",
+    isScam: true,
+    options: [
+      { text: "Перевести деньги", outcome: { cash: -5000, msg: "Аккаунт Андрея взломали. Деньги ушли мошенникам. Всегда проверяй друга по телефону!", type: "bad" } },
+      { text: "Позвонить Андрею по телефону", outcome: { cash: 0, msg: "Правильно! Друг сказал, что его взломали, — ты спас 5 000 ₽ от кражи.", type: "good" } },
+      { text: "Спросить контрольный вопрос в чате", outcome: { cash: 0, msg: "Хорошо! Мошенник не смог ответить и исчез. Но звонок надёжнее.", type: "info" } },
+    ]
+  },
+  {
+    emoji: "💰", name: "«Инвестиции в цифровой рубль»",
+    text: "«Вложи 10 000 ₽ в цифровой рубль — гарантированные 50% в месяц! Только сегодня!»",
+    isScam: true,
+    options: [
+      { text: "Вложить деньги", outcome: { cash: -10000, msg: "Финансовая пирамида. Цифровой рубль — форма валюты, не инвестиция. Гарантированной доходности 50%/мес не бывает.", type: "bad" } },
+      { text: "Отказаться", outcome: { cash: 0, msg: "Верно! Цифровой рубль — цифровая форма рубля от ЦБ. В него не «инвестируют». Ты не попался на удочку мошенников.", type: "good" } },
+    ]
+  },
+  {
+    emoji: "🎁", name: "«Ты выиграл iPhone!»",
+    text: "«Поздравляем! Вы выиграли iPhone 15 Pro! Для получения оплатите доставку — 500 ₽»",
+    isScam: true,
+    options: [
+      { text: "Оплатить доставку", outcome: { cash: -500, msg: "Никакого iPhone нет. Классика: «оплати доставку/налог/пошлину».", type: "bad" } },
+      { text: "Игнорировать", outcome: { cash: 0, msg: "Правильно! Настоящие призы не требуют предоплаты — ты спас свои 500 ₽.", type: "good" } },
+    ]
+  },
+  {
+    emoji: "💼", name: "«HR» просит данные карты",
+    text: "«Привет! Переходим на новую зарплатную карту. Пришли номер и CVV новой карты для перевода зарплаты»",
+    isScam: true,
+    options: [
+      { text: "Отправить данные", outcome: { cash: -10000, msg: "Это мошенник с фейкового аккаунта. CVV — секретный код, его нельзя никому отправлять!", type: "bad" } },
+      { text: "Позвонить в HR по рабочему номеру", outcome: { cash: 0, msg: "Правильно! Оказалось, никто карту не менял. Ты сохранил контроль над счётом.", type: "good" } },
+    ]
+  },
+  {
+    emoji: "📦", name: "«Курьер» просит код из СМС",
+    text: "Звонок: «Здравствуйте, я курьер, привёз посылку. Назовите код из СМС для подтверждения доставки». Ты ничего не заказывал.",
+    isScam: true,
+    options: [
+      { text: "Назвать код из СМС", outcome: { cash: -8000, msg: "Мошенники получили код входа в твой личный кабинет банка и списали деньги. Настоящие курьеры просят код ЗАКАЗА из приложения маркетплейса (Ozon, WB), а не код из СМС!", type: "bad" } },
+      { text: "Сказать, что ничего не заказывал, и сбросить", outcome: { cash: 0, msg: "Правильно! Если ты ничего не заказывал — вежливо откажись. Настоящий курьер не просит банковские СМС-коды.", type: "good" } },
+    ]
+  },
+
+  // ===== ЛЕГИТИМНЫЕ (здесь можно получать деньги — это реальные поступления) =====
+  {
+    emoji: "🚚", name: "Курьер маркетплейса",
+    text: "Звонок: «Здравствуйте, курьер Ozon. Заказ №4821, назовите код получения». Ты реально ждал посылку.",
+    isScam: false,
+    options: [
+      { text: "Назвать код заказа из приложения", outcome: { cash: 0, msg: "Верно! Курьер просит код ЗАКАЗА из приложения маркетплейса, а не код из СМС банка. Посылка получена.", type: "good" } },
+      { text: "Отказаться: «я ничего не заказывал»", outcome: { cash: -2000, msg: "Курьер уехал, посылка вернулась. Ты потерял оплаченный товар (2000 ₽). Не путай код заказа и банковский код!", type: "bad" } },
+    ]
+  },
+  {
+    emoji: "👩‍👦", name: "Мама просит денег",
+    text: "«Сынок, скинь 3000 ₽ на лекарства, карта та же». Это сообщение с номера мамы, который ты знаешь.",
+    isScam: false,
+    options: [
+      { text: "Перезвонить для проверки", outcome: { cash: -3000, msg: "Мама подтвердила — ей действительно нужна помощь. Ты поступил и бдительно, и по-сыновьи.", type: "good" } },
+      { text: "Перевести сразу", outcome: { cash: -3000, msg: "Деньги дошли до мамы. Но проверять по телефону — полезная привычка.", type: "info" } },
+      { text: "Проигнорировать — вдруг взлом", outcome: { cash: 0, msg: "Мама обиделась. Номер был настоящий, взлома не было. Проверять надо, но не игнорировать близких.", type: "bad" } },
+    ]
+  },
+  {
+    emoji: "🔔", name: "Пуш о списании подписки",
+    text: "Приложение банка показало списание 300 ₽ «Яндекс Плюс». Ты действительно оформлял подписку месяц назад.",
+    isScam: false,
+    options: [
+      { text: "Открыть приложение и отменить подписку", outcome: { cash: 0, msg: "Молодец! Это была реальная подписка. Ты вовремя её отменил и сэкономишь 300 ₽ в следующем месяце.", type: "good" } },
+      { text: "Звонить в банк: «отмените мошенническое!»", outcome: { cash: -300, msg: "Банк объяснил, что это твоя подписка. Деньги не вернули, ещё и потратил время.", type: "bad" } },
+    ]
+  },
+  {
+    emoji: "📧", name: "Письмо от Госуслуг",
+    text: "«Вам одобрен налоговый вычет 7 800 ₽. Для получения зайдите в личный кабинет»",
+    isScam: false,
+    options: [
+      { text: "Зайти в Госуслуги через официальное приложение", outcome: { cash: 7800, msg: "Отлично! Вычет реальный, ты получил 7 800 ₽. Всегда заходи в Госуслуги через официальное приложение, а не по ссылке из письма.", type: "good" } },
+      { text: "Перейти по ссылке из письма", outcome: { cash: -3000, msg: "Ссылка могла быть фишингом. Всегда заходи в госуслуги только через приложение или вбивая gosuslugi.ru вручную.", type: "bad" } },
+      { text: "Проигнорировать — вдруг мошенники", outcome: { cash: 0, msg: "Это было настоящее уведомление! Ты потерял 7 800 ₽, которые мог вернуть. Не всякое уведомление — мошенничество.", type: "bad" } },
+    ]
+  },
+  {
+    emoji: "🎁", name: "СМС о переводе",
+    text: "«Вам переведено 500 ₽ от Андрея». Ты не помнишь, чтобы он был тебе должен, но Андрей — твой друг.",
+    isScam: false,
+    options: [
+      { text: "Спросить у Андрея, за что перевод", outcome: { cash: 500, msg: "Андрей сказал, что это возврат за обед, который ты оплатил на прошлой неделе. Всё честно!", type: "good" } },
+      { text: "Вернуть деньги обратно", outcome: { cash: 0, msg: "Андрей немного смутился — это был его долг. Ты зря вернул деньги.", type: "bad" } },
+    ]
+  },
+];
+
+const TEMPTATIONS = [
+  { emoji: "🎮", name: "Новая игра", cost: 3000, moodChange: 15, desc: "Порадует вечером" },
+  { emoji: "👟", name: "Модные кроссовки со скидкой", cost: 7000, moodChange: 20, desc: "Давно хотел" },
+  { emoji: "🎬", name: "Поход в кино с друзьями", cost: 1500, moodChange: 25, desc: "Общение и отдых" },
+  { emoji: "🍔", name: "Доставка вредной еды", cost: 1200, moodChange: 10, desc: "Вкусно, но пустые калории" },
+  { emoji: "🎧", name: "Наушники, которые давно хотел", cost: 4500, moodChange: 22, desc: "Музыка всегда с собой" },
+  { emoji: "🍕", name: "Пицца на весь вечер", cost: 2000, moodChange: 15, desc: "Хороший вечер" },
+  { emoji: "📚", name: "Книга по саморазвитию", cost: 1000, moodChange: 18, desc: "Инвестиция в себя" },
+  { emoji: "🏋️", name: "Разовый абонемент в спортзал", cost: 1500, moodChange: 22, desc: "Спорт и здоровье" },
+];
+
+const QUIZZES = [
+  { topic: "Деньги", question: "Что такое деньги?", options: ["Просто бумажки и монеты", "Универсальный эквивалент стоимости товаров и услуг", "То, что печатает государство"], correct: 1, explanation: "Деньги — это универсальный эквивалент. Они работают как мера стоимости, средство обмена и средство накопления. Бумажки без доверия людей к системе ничего не стоят." },
+  { topic: "Цифровой рубль", question: "Что такое цифровой рубль?", options: ["Криптовалюта, как биткоин", "Цифровая форма российского рубля, выпускаемая ЦБ", "Безналичные деньги на карте"], correct: 1, explanation: "Цифровой рубль — это третья форма российской валюты (после наличной и безналичной), которую выпускает Банк России. Он равен обычному рублю и хранится в цифровом кошельке на платформе ЦБ. Это НЕ криптовалюта и НЕ инвестиция." },
+  { topic: "Бюджет", question: "Что такое личный бюджет?", options: ["Список желаний", "План доходов и расходов на период", "Кредитная карта"], correct: 1, explanation: "Личный бюджет — это план доходов и расходов. Он помогает понять, куда уходят деньги, и контролировать траты. Без бюджета деньги «исчезают» незаметно." },
+  { topic: "Налоги", question: "Что такое НДФЛ?", options: ["Налог на добавленную стоимость", "Налог на доходы физических лиц", "Налог на домашних животных"], correct: 1, explanation: "НДФЛ — налог на доходы физических лиц. В России обычно 13% от зарплаты. Именно эту сумму работодатель удерживает до того, как деньги попадают к тебе на счёт." },
+  { topic: "Налоговый вычет", question: "Что такое налоговый вычет?", options: ["Штраф за неуплату налогов", "Возврат части ранее уплаченного НДФЛ", "Скидка в магазине для налогоплательщиков"], correct: 1, explanation: "Налоговый вычет позволяет вернуть часть НДФЛ, уплаченного с расходов на обучение, лечение, спорт, покупку жилья. Например, заплатил за обучение 50 000 ₽ — можешь вернуть до 6 500 ₽." },
+  { topic: "Кредиты", question: "Чем опасна кредитная карта?", options: ["Она всегда плохая и её нельзя брать", "Высокими процентами, если не гасить долг вовремя", "С неё нельзя снимать наличные"], correct: 1, explanation: "Кредитка — удобный инструмент, если гасить долг в льготный период. Но если не платить вовремя, проценты могут быть 20–40% годовых, и долг растёт как снежный ком." },
+  { topic: "Микрозаймы", question: "Что такое микрозайм?", options: ["Обычный банковский кредит", "Короткий займ под очень высокий процент", "Кредит только для бизнеса"], correct: 1, explanation: "Микрозаймы (МФО) — короткие займы под огромные проценты: часто 200–365% годовых. Берут, когда срочно нужны деньги, но цена такой «помощи» — очень высокая." },
+  { topic: "Страхование", question: "Зачем нужно страхование?", options: ["Чтобы платить деньги просто так", "Чтобы переложить крупный риск на страховую компанию", "Чтобы получить кредит"], correct: 1, explanation: "Страхование защищает от крупных потерь: платишь небольшую сумму, а при происшествии получаешь покрытие. Это не про «нажиться», а про защиту от катастроф." },
+  { topic: "Подушка", question: "Какой оптимальный размер подушки безопасности?", options: ["1 неделя расходов", "3–6 месяцев обязательных расходов", "3 года расходов"], correct: 1, explanation: "Подушка на 3–6 месяцев обязательных расходов — золотой стандарт. Меньше — не покроет серьёзную проблему. Больше — деньги замораживаются и съедаются инфляцией." },
+  { topic: "Мошенники", question: "Что делать, если «сотрудник банка» просит код из СМС?", options: ["Назвать код — банку виднее", "Сбросить и позвонить в банк по номеру с карты", "Записать разговор и перезвонить по входящему номеру"], correct: 1, explanation: "Настоящий банк НИКОГДА не спрашивает коды из СМС по телефону. Правильное действие — сбросить и самостоятельно позвонить по официальному номеру." },
+  { topic: "Инфляция", question: "Что такое инфляция?", options: ["Рост цен на товары и услуги", "Снижение налогов", "Рост зарплат"], correct: 0, explanation: "Инфляция — это обесценивание денег, при котором растут цены. Если деньги лежат «под матрасом», их покупательная способность падает. Поэтому накопления важно защищать." },
+  { topic: "Сложный процент", question: "Как работает сложный процент?", options: ["Процент начисляется только на вложенную сумму", "Процент начисляется и на вложенную сумму, и на уже накопленные проценты", "Процент постоянный и никогда не меняется"], correct: 1, explanation: "Сложный процент — «процент на процент». Он ускоряет рост накоплений со временем. Твой главный друг в долгосрочных вложениях." },
+  { topic: "Финансовые цели", question: "Зачем ставить финансовые цели?", options: ["Чтобы хвастаться перед друзьями", "Чтобы понимать, сколько и зачем откладывать", "Это бесполезно — деньги всё равно тратятся"], correct: 1, explanation: "Конкретная цель («накопить 50 000 ₽ на поездку к лету») даёт мотивацию экономить и понимать, что деньги — инструмент, а не цель. Без цели сложно копить." },
+];
+
+let state = {};
+
+function resetState() {
+  state = {
+    month: 1, phase: 'start',
+    cash: 0, creditCard: 0, microloan: 0, insuranceActive: false,
+    mood: CONFIG.moodStart,
+    monthLog: [], queue: [], queueIndex: 0,
+    pastCards: [],
+    pendingEvent: null, eventResolved: false, eventPaidMethod: null, scenarioResult: null,
+    pendingTemptation: null, temptationResolved: false, temptationBought: null,
+    pendingQuiz: null, quizResolved: false, quizAnswer: null,
+    taxData: null, taxResolved: false, taxDecision: null,
+    usedQuizzes: new Set(),
+    totalInterest: 0, totalInsurance: 0, totalEventsGross: 0, totalEventsCovered: 0,
+    totalMicroloanOverpay: 0, totalTaxPaid: 0, totalTaxRefund: 0,
+    totalFraudLoss: 0, totalOverCautiousLoss: 0, totalTemptationSpent: 0,
+    correctQuizzes: 0, totalQuizzes: 0,
+    shownCards: new Set(), pageEntering: false, transitioning: false,
+  };
+}
+
+const fmt = n => Math.round(n).toLocaleString('ru-RU');
+const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
+function addLog(text, type = 'neutral') { state.monthLog.push({ text, type }); }
+function pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+
+function startGame() {
+  resetState();
+  state.phase = 'month_start';
+  state.pageEntering = true;
+  render();
+}
+
+function applyPayday() {
+  state.monthLog = [];
+
+  // Импульсивные «допинги»: списание денег + краткосрочное облегчение (+15 настроения)
+  if (state.mood < 50) {
+    state.cash -= 2000;
+    addLog(`😔 Низкое настроение → импульсивные «допинги» (фастфуд, подписки, мелочи). −2 000 ₽, но на душе чуть легче`, 'negative');
+    state.mood = Math.min(65, state.mood + 15);
+  }
+
+  const gross = CONFIG.salaryGross;
+  const ndfl = Math.round(gross * CONFIG.ndfl);
+  const net = gross - ndfl;
+  state.cash += net;
+  state.totalTaxPaid += ndfl;
+  addLog(`💼 Зарплата ${fmt(gross)} ₽ · НДФЛ 13% −${fmt(ndfl)} ₽ → на руки +${fmt(net)} ₽`, 'positive');
+
+  state.cash -= CONFIG.living;
+  addLog(`🏠 Жильё, еда, транспорт −${fmt(CONFIG.living)} ₽`, 'negative');
+
+  if (state.insuranceActive) {
+    state.cash -= CONFIG.insuranceCost;
+    state.totalInsurance += CONFIG.insuranceCost;
+    addLog(`🛡️ Страховка −${fmt(CONFIG.insuranceCost)} ₽`, 'negative');
+  }
+
+  if (state.microloan > 0) {
+    if (state.cash >= state.microloan) {
+      state.cash -= state.microloan;
+      addLog(`🏦 Погашен микрозайм −${fmt(state.microloan)} ₽`, 'negative');
+      state.microloan = 0;
+    } else {
+      const shortfall = state.microloan - Math.max(0, state.cash);
+      state.cash = 0;
+      state.creditCard += shortfall;
+      addLog(`⚠️ Микрозайм не погашен! ${fmt(shortfall)} ₽ перенесено на кредитку`, 'warning');
+      state.microloan = 0;
+    }
+  }
+
+  if (state.creditCard > 0) {
+    const interest = Math.round(state.creditCard * CONFIG.creditRate);
+    state.creditCard += interest;
+    state.totalInterest += interest;
+    addLog(`💳 Проценты по кредитке +${fmt(interest)} ₽ к долгу`, 'warning');
+  }
+
+  state.insuranceActive = false;
+}
+
+function beginMonth() {
+  if (state.transitioning) return;
+  state.transitioning = true;
+  applyPayday();
+
+  // Генерируем до 2 событий и до 2 соблазнов, чтобы месяц был насыщеннее
+  const queue = ['payday'];
+  if (Math.random() < 0.9) queue.push('event'); 
+  if (Math.random() < 0.5) queue.push('event');
+  if (Math.random() < 0.7) queue.push('temptation');
+  if (Math.random() < 0.4) queue.push('temptation');
+  queue.push('quiz');
+  if (state.month === 12) queue.push('tax');
+  queue.push('month_end');
+  
+  state.queue = queue;
+  state.queueIndex = 0;
+  state.phase = 'payday';
+
+  setTimeout(() => {
+    state.transitioning = false;
+    render();
+    setTimeout(() => advancePhase(), 60);
+  }, 200);
+}
+
+function advancePhase() {
+  if (state.transitioning) return;
+  
+  const currentPhase = state.queue[state.queueIndex];
+  if (currentPhase === 'event' && state.pendingEvent) {
+      state.pastCards.push({ type: 'event', data: { event: state.pendingEvent, resolved: state.eventResolved, paidMethod: state.eventPaidMethod, scenarioResult: state.scenarioResult } });
+      state.pendingEvent = null;
+  } else if (currentPhase === 'temptation' && state.pendingTemptation) {
+      state.pastCards.push({ type: 'temptation', data: { temptation: state.pendingTemptation, resolved: state.temptationResolved, bought: state.temptationBought } });
+      state.pendingTemptation = null;
+  } else if (currentPhase === 'quiz' && state.pendingQuiz) {
+      state.pastCards.push({ type: 'quiz', data: { quiz: state.pendingQuiz, resolved: state.quizResolved, answer: state.quizAnswer } });
+      state.pendingQuiz = null;
+  } else if (currentPhase === 'tax' && state.taxData) {
+      state.pastCards.push({ type: 'tax', data: { tax: state.taxData, resolved: state.taxResolved, decision: state.taxDecision } });
+      state.taxData = null;
+  }
+
+  state.transitioning = true;
+  state.queueIndex++;
+
+  if (state.queueIndex >= state.queue.length) {
+    state.transitioning = false;
+    return;
+  }
+
+  const next = state.queue[state.queueIndex];
+  state.phase = next;
+
+  if (next === 'event') prepareEvent();
+  if (next === 'temptation') prepareTemptation();
+  if (next === 'quiz') prepareQuiz();
+  if (next === 'tax') prepareTax();
+
+  setTimeout(() => {
+    state.transitioning = false;
+    render();
+  }, 180);
+}
+
+function prepareEvent() {
+  if (Math.random() < 0.55) {
+    const evt = pick(SCENARIO_EVENTS);
+    state.pendingEvent = { ...evt, type: 'scenario' };
+    state.scenarioResult = null;
+  } else {
+    const e = pick(RISK_EVENTS);
+    let cost = e.cost;
+    let covered = 0;
+    if (state.insuranceActive && e.insurable) {
+      covered = Math.round(cost * CONFIG.insuranceCoverage);
+      cost -= covered;
+      state.totalEventsCovered += covered;
+    }
+    state.totalEventsGross += e.cost;
+    state.pendingEvent = { ...e, cost, covered, type: 'risk' };
+  }
+  state.eventResolved = false;
+  state.eventPaidMethod = null;
+}
+
+function prepareTemptation() {
+  const t = { ...pick(TEMPTATIONS) };
+  if (state.cash < t.cost * 1.5 && state.cash > 500) {
+    t.cost = Math.max(500, Math.round((state.cash * 0.3) / 100) * 100);
+    t.name += " (бюджетный вариант)";
+    t.moodChange = Math.max(8, Math.round(t.moodChange * 0.7));
+  } else if (state.cash > 20000) {
+    t.cost = Math.round(t.cost * 1.2 / 100) * 100;
+    t.moodChange = Math.min(30, t.moodChange + 5);
+  }
+  state.pendingTemptation = t;
+  state.temptationResolved = false;
+  state.temptationBought = null;
+}
+
+function prepareQuiz() {
+  const remaining = QUIZZES.filter(q => !state.usedQuizzes.has(q.topic));
+  if (remaining.length === 0) {
+    state.pendingQuiz = null;
+    return;
+  }
+  const q = pick(remaining);
+  state.usedQuizzes.add(q.topic);
+  state.pendingQuiz = q;
+  state.quizResolved = false;
+  state.quizAnswer = null;
+  state.totalQuizzes++;
+}
+
+function prepareTax() {
+  const eligible = 60000;
+  const refund = Math.round(eligible * CONFIG.ndfl);
+  state.taxData = { eligible, refund };
+  state.taxResolved = false;
+  state.taxDecision = null;
+}
+
+function payRisk(method) {
+  const cost = state.pendingEvent.cost;
+  state.eventPaidMethod = method;
+  if (method === 'cash') {
+    state.cash -= cost;
+    addLog(`💵 Оплачено наличными −${fmt(cost)} ₽`, 'negative');
+  } else if (method === 'credit') {
+    state.creditCard += cost;
+    addLog(`💳 Оплачено с кредитки +${fmt(cost)} ₽ к долгу`, 'warning');
+  } else if (method === 'microloan') {
+    const debt = Math.round(cost * (1 + CONFIG.microloanRate));
+    state.microloan = debt;
+    state.totalMicroloanOverpay += debt - cost;
+    addLog(`🏦 Микрозайм: взято ${fmt(cost)} ₽ · вернуть ${fmt(debt)} ₽ (переплата ${fmt(debt - cost)} ₽)`, 'warning');
+  }
+  state.eventResolved = true;
+  render();
+}
+
+function resolveScenario(idx) {
+  const evt = state.pendingEvent;
+  const out = evt.options[idx].outcome;
+  // Начисляем только реальные деньги (положительный cash возможен лишь у легитимных сценариев)
+  if (out.cash) state.cash += out.cash;
+  if (out.cash < 0) {
+    if (evt.isScam) state.totalFraudLoss += Math.abs(out.cash);
+    else state.totalOverCautiousLoss += Math.abs(out.cash);
+  }
+  state.scenarioResult = out;
+  state.eventResolved = true;
+  render();
+}
+
+function resolveTemptation(buy) {
+  if (buy) {
+    state.cash -= state.pendingTemptation.cost;
+    state.totalTemptationSpent += state.pendingTemptation.cost;
+    state.mood = clamp(state.mood + state.pendingTemptation.moodChange, 0, 100);
+  } else {
+    state.mood = clamp(state.mood - 10, 0, 100);
+  }
+  state.temptationBought = buy;
+  state.temptationResolved = true;
+  render();
+}
+
+function answerQuiz(idx) {
+  state.quizAnswer = idx;
+  state.quizResolved = true;
+  if (idx === state.pendingQuiz.correct) {
+    state.cash += CONFIG.quizBonus;
+    state.correctQuizzes++;
+  }
+  render();
+}
+
+function applyTaxSubmit() {
+  state.cash += state.taxData.refund;
+  state.totalTaxRefund += state.taxData.refund;
+  state.taxResolved = true;
+  state.taxDecision = 'submit';
+  render();
+}
+function applyTaxSkip() {
+  state.taxResolved = true;
+  state.taxDecision = 'skip';
+  render();
+}
+
+function payOffCredit() {
+  const pay = Math.min(state.cash, state.creditCard);
+  state.cash -= pay;
+  state.creditCard -= pay;
+  render();
+}
+
+function nextMonth() {
+  if (state.transitioning) return;
+  state.transitioning = true;
+
+  const pc = document.getElementById('page-content');
+  if (pc) pc.classList.add('page-exit');
+
+  setTimeout(() => {
+    state.month++;
+    state.monthLog = [];
+    state.queue = [];
+    state.queueIndex = 0;
+    state.pastCards = [];
+    state.insuranceActive = false;
+    state.pendingEvent = null;
+    state.pendingTemptation = null;
+    state.pendingQuiz = null;
+    state.taxData = null;
+    state.eventPaidMethod = null;
+    state.scenarioResult = null;
+    state.taxResolved = false;
+    state.eventResolved = false;
+    state.temptationResolved = false;
+    state.quizResolved = false;
+    state.shownCards = new Set();
+    state.transitioning = false;
+
+    if (state.month > CONFIG.totalMonths) {
+      state.phase = 'summary';
+      render();
+      return;
+    }
+    state.phase = 'month_start';
+    state.pageEntering = true;
+    render();
+  }, 360);
+}
+
+function toggleInsurance() {
+  state.insuranceActive = !state.insuranceActive;
+  const el = document.getElementById('insurance-toggle');
+  if (!el) return;
+  el.classList.toggle('active', state.insuranceActive);
+  el.querySelector('.checkbox').textContent = state.insuranceActive ? '✓' : '';
+}
+
+function render() {
+  const app = document.getElementById('app');
+  if (state.phase === 'start') {
+    app.innerHTML = renderStart();
+    document.getElementById('start-btn').onclick = startGame;
+    return;
+  }
+  if (state.phase === 'summary') {
+    app.innerHTML = renderSummary();
+    document.getElementById('restart-btn').onclick = startGame;
+    return;
+  }
+  if (!document.getElementById('status-card')) {
+    app.innerHTML = `<div class="card" id="status-card"></div><div id="page"><div id="page-content"></div></div>`;
+  }
+  updateStatusCard();
+  updatePage();
+}
+
+function updateStatusCard() {
+  const card = document.getElementById('status-card');
+  if (!card) return;
+  const netWorth = state.cash - state.creditCard - state.microloan;
+  const progress = ((state.month - 1) / CONFIG.totalMonths) * 100;
+  
+  let moodColor = 'value-green';
+  let moodEmoji = '😊';
+  if (state.mood < 30) { moodColor = 'value-red'; moodEmoji = '😫'; }
+  else if (state.mood < 50) { moodColor = 'value-red'; moodEmoji = '😔'; }
+  else if (state.mood < 70) { moodColor = 'value-yellow'; moodEmoji = '😐'; }
+  else if (state.mood > 85) { moodColor = 'value-pink'; moodEmoji = '🤩'; }
+
+  card.innerHTML = `
+    <div class="month-header">
+      <h2>Месяц ${state.month} из ${CONFIG.totalMonths}</h2>
+      <div class="month-badge">${state.month}/${CONFIG.totalMonths}</div>
+    </div>
+    <div class="progress-bar"><div class="progress-fill" style="width:${progress}%"></div></div>
+    <div class="status-grid">
+      <div class="status-item">
+        <div class="status-label">💵 Наличные</div>
+        <div class="status-value ${state.cash >= 0 ? 'value-green' : 'value-red'}">${fmt(state.cash)} ₽</div>
+      </div>
+      <div class="status-item">
+        <div class="status-label">💳 Кредитка</div>
+        <div class="status-value ${state.creditCard > 0 ? 'value-red' : 'value-green'}">${fmt(state.creditCard)} ₽</div>
+      </div>
+      <div class="status-item">
+        <div class="status-label">🏦 Микрозайм</div>
+        <div class="status-value ${state.microloan > 0 ? 'value-red' : 'value-green'}">${fmt(state.microloan)} ₽</div>
+      </div>
+      <div class="status-item">
+        <div class="status-label">${moodEmoji} Настроение</div>
+        <div class="status-value ${moodColor}">${state.mood}%</div>
+      </div>
+      <div class="status-item">
+        <div class="status-label">📊 Капитал</div>
+        <div class="status-value ${netWorth >= 0 ? 'value-green' : 'value-red'}">${fmt(netWorth)} ₽</div>
+      </div>
+    </div>
+  `;
+}
+
+function computeCards() {
+  const cards = [];
+  if (state.phase === 'month_start') {
+    cards.push({ key: 'start', html: renderStartCard() });
+    return cards;
+  }
+  for (let i = 0; i < state.monthLog.length; i++) {
+    cards.push({ key: `log-${i}`, html: state.monthLog[i].text, type: 'log', logType: state.monthLog[i].type });
+  }
+  
+  state.pastCards.forEach((card, idx) => {
+    if (card.type === 'event') {
+      const isScenario = card.data.event.type === 'scenario';
+      cards.push({
+        key: `past-event-${idx}`,
+        html: renderEventCardHTML(card.data, false),
+        type: 'event',
+        extraClass: `${isScenario ? 'scenario' : ''} paid`.trim(),
+      });
+    } else if (card.type === 'temptation') {
+      cards.push({ key: `past-temptation-${idx}`, html: renderTemptationCardHTML(card.data, false), type: 'temptation' });
+    } else if (card.type === 'quiz') {
+      cards.push({ key: `past-quiz-${idx}`, html: renderQuizCardHTML(card.data, false), type: 'quiz' });
+    } else if (card.type === 'tax') {
+      cards.push({ key: `past-tax-${idx}`, html: renderTaxCardHTML(card.data, false), type: 'tax' });
+    }
+  });
+
+  const phase = state.phase;
+  if (phase === 'event' && state.pendingEvent) {
+    const isScenario = state.pendingEvent.type === 'scenario';
+    cards.push({
+      key: `current-event`,
+      html: renderEventCardHTML({ event: state.pendingEvent, resolved: state.eventResolved, paidMethod: state.eventPaidMethod, scenarioResult: state.scenarioResult }, true),
+      type: 'event',
+      extraClass: `${isScenario ? 'scenario' : ''} ${state.eventResolved ? 'paid' : ''}`.trim(),
+    });
+  } else if (phase === 'temptation' && state.pendingTemptation) {
+    cards.push({
+      key: `current-temptation`,
+      html: renderTemptationCardHTML({ temptation: state.pendingTemptation, resolved: state.temptationResolved, bought: state.temptationBought }, true),
+      type: 'temptation'
+    });
+  } else if (phase === 'quiz' && state.pendingQuiz) {
+    cards.push({ key: `current-quiz`, html: renderQuizCardHTML({ quiz: state.pendingQuiz, resolved: state.quizResolved, answer: state.quizAnswer }, true), type: 'quiz' });
+  } else if (phase === 'tax' && state.taxData) {
+    cards.push({ key: `current-tax`, html: renderTaxCardHTML({ tax: state.taxData, resolved: state.taxResolved, decision: state.taxDecision }, true), type: 'tax' });
+  } else if (phase === 'month_end') {
+    cards.push({ key: `current-end`, html: renderEndCard(), type: 'end' });
+  }
+
+  return cards;
+}
+
+function updatePage() {
+  const pageContent = document.getElementById('page-content');
+  if (!pageContent) return;
+  const cards = computeCards();
+  const animatePage = state.pageEntering;
+  state.pageEntering = false;
+  pageContent.classList.remove('page-enter', 'page-exit');
+
+  let html = '';
+  let newIndex = 0;
+  for (const card of cards) {
+    const isNew = !state.shownCards.has(card.key);
+    state.shownCards.add(card.key);
+    const classes = ['feed-card'];
+    if (card.type) classes.push(card.type);
+    if (card.logType) classes.push(card.logType);
+    if (card.extraClass) classes.push(...card.extraClass.split(' ').filter(Boolean));
+    let inlineStyle = '';
+    if (isNew && !animatePage) {
+      classes.push('slide-from-right');
+      inlineStyle = `animation-delay:${newIndex * 0.13}s;`;
+      newIndex++;
+    }
+    html += `<div class="${classes.join(' ')}" style="${inlineStyle}" data-key="${card.key}">${card.html}</div>`;
+  }
+  pageContent.innerHTML = html;
+
+  if (animatePage) {
+    void pageContent.offsetWidth;
+    pageContent.classList.add('page-enter');
+  }
+}
+
+function renderStartCard() {
+  return `
+    <div class="insurance-toggle ${state.insuranceActive ? 'active' : ''}" id="insurance-toggle" onclick="toggleInsurance()">
+      <div>
+        <div style="font-weight:600;margin-bottom:2px;">🛡️ Купить страховку на этот месяц</div>
+        <div class="muted" style="font-size:13px;">
+          ${fmt(CONFIG.insuranceCost)} ₽ · покрывает ${CONFIG.insuranceCoverage*100}% рисковых событий (не мошенничества и не соблазны)
+        </div>
+      </div>
+      <div class="checkbox">${state.insuranceActive ? '✓' : ''}</div>
+    </div>
+    <button onclick="beginMonth()" style="width:100%;margin-top:12px;">Прожить месяц ${state.month} →</button>
+  `;
+}
+
+function renderEventCardHTML(data, isActive) {
+  if (!data.event) return '';
+  return data.event.type === 'scenario' ? renderScenarioCardHTML(data, isActive) : renderRiskCardHTML(data, isActive);
+}
+
+function renderRiskCardHTML(data, isActive) {
+  const e = data.event;
+  const covered = e.covered || 0;
+  const cost = e.cost;
+
+  let html = `
+    <div class="event-emoji">${e.emoji}</div>
+    <div class="event-title">${e.name}</div>
+    ${covered > 0 ? `<div class="muted" style="font-size:13px;margin-bottom:6px;">💡 Полный ущерб ${fmt(e.cost + covered)} ₽ · страховка покрыла ${fmt(covered)} ₽</div>` : ''}
+    <div class="event-cost">−${fmt(cost)} ₽</div>
+  `;
+
+  if (data.resolved) {
+    const labels = { cash: 'наличными', credit: 'с кредитки', microloan: 'микрозаймом' };
+    html += `<div class="event-paid-badge">✓ Оплачено ${labels[data.paidMethod] || 'наличными'}</div>`;
+    if (isActive) {
+      html += `<button onclick="advancePhase()" style="width:100%;margin-top:14px;">Дальше →</button>`;
+    }
+    return html;
+  }
+
+  const canCash = state.cash >= cost;
+  const canCredit = state.creditCard + cost <= CONFIG.creditLimit;
+  const microTotal = Math.round(cost * (1 + CONFIG.microloanRate));
+
+  html += `
+    <div style="margin-top:14px;">
+      <div style="margin-bottom:10px;font-weight:600;">Как оплатить?</div>
+      <div style="display:flex;flex-direction:column;gap:10px;">
+        <button onclick="payRisk('cash')" ${!canCash ? 'disabled' : ''} class="success" style="text-align:left;padding:12px 16px;">
+          💵 <b>Наличными</b> — ${fmt(cost)} ₽
+          <div style="font-size:12px;opacity:0.85;margin-top:4px;font-weight:400;">
+            ${!canCash ? `Недостаточно средств (у тебя ${fmt(state.cash)} ₽)` : `Остаток: ${fmt(state.cash - cost)} ₽`}
+          </div>
+        </button>
+        <button onclick="payRisk('credit')" ${!canCredit ? 'disabled' : ''} class="warning" style="text-align:left;padding:12px 16px;">
+          💳 <b>С кредитки</b> — ${fmt(cost)} ₽
+          <div style="font-size:12px;opacity:0.85;margin-top:4px;font-weight:400;">
+            ${!canCredit ? 'Лимит кредитки исчерпан' : `Свободно ${fmt(CONFIG.creditLimit - state.creditCard - cost)} ₽ · ${CONFIG.creditRate*100}%/мес на долг`}
+          </div>
+        </button>
+        <button onclick="payRisk('microloan')" class="danger" style="text-align:left;padding:12px 16px;">
+          🏦 <b>Микрозайм</b> — получишь ${fmt(cost)} ₽
+          <div style="font-size:12px;opacity:0.9;margin-top:4px;font-weight:400;">
+            Вернуть через месяц: <b>${fmt(microTotal)} ₽</b> · переплата ${fmt(microTotal - cost)} ₽
+          </div>
+        </button>
+      </div>
+    </div>
+  `;
+  return html;
+}
+
+function renderScenarioCardHTML(data, isActive) {
+  const e = data.event;
+  let html = `
+    <div class="event-emoji">${e.emoji}</div>
+    <div class="event-title">${e.name}</div>
+    <div class="event-text">${e.text}</div>
+  `;
+
+  if (data.resolved) {
+    const r = data.scenarioResult;
+    html += `<div class="result-box ${r.type}">${r.msg}</div>`;
+    if (isActive) {
+      html += `<button onclick="advancePhase()" style="width:100%;margin-top:14px;">Дальше →</button>`;
+    }
+    return html;
+  }
+
+  html += `<div style="margin-bottom:8px;font-weight:600;">Что делаешь?</div><div style="display:flex;flex-direction:column;gap:8px;">`;
+  e.options.forEach((opt, i) => {
+    html += `<button onclick="resolveScenario(${i})" class="secondary" style="text-align:left;padding:12px 14px;line-height:1.4;">${opt.text}</button>`;
+  });
+  html += `</div>`;
+  return html;
+}
+
+function renderTemptationCardHTML(data, isActive) {
+  const t = data.temptation;
+  if (!t) return '';
+  
+  let html = `
+    <div style="font-size:12px;color:var(--purple);font-weight:700;letter-spacing:0.5px;margin-bottom:6px;">🎯 СОБЛАЗН</div>
+    <div class="event-emoji">${t.emoji}</div>
+    <div class="event-title">${t.name}</div>
+    <div class="event-cost" style="color:var(--purple);">−${fmt(t.cost)} ₽</div>
+    <div class="muted" style="font-size:13px;margin-top:4px;">${t.desc} · <span style="color:var(--green)">+${t.moodChange} к настроению</span></div>
+  `;
+
+  if (data.resolved) {
+    if (data.bought) {
+      html += `<div class="result-box good">Ты купил это! Деньги ушли, но настроение улучшилось (+${t.moodChange}). Иногда баловать себя полезно.</div>`;
+    } else {
+      html += `<div class="result-box info">Ты воздержался. Деньги сохранены, но настроение упало (−10). Если экономить постоянно — можно выгореть.</div>`;
+    }
+    if (isActive) {
+      html += `<button onclick="advancePhase()" style="width:100%;margin-top:12px;">Дальше →</button>`;
+    }
+    return html;
+  }
+  
+  const canBuy = state.cash >= t.cost;
+  html += `<div style="margin-top:14px;font-weight:600;margin-bottom:8px;">Что делаешь?</div>
+    <div style="display:flex;flex-direction:column;gap:8px;">
+      <button onclick="resolveTemptation(true)" ${!canBuy ? 'disabled' : ''} class="success" style="text-align:left;padding:12px 14px;">
+        Купить за ${fmt(t.cost)} ₽ <span style="font-weight:400;font-size:13px;opacity:0.9;">(+${t.moodChange} настроения)</span>
+        ${!canBuy ? `<div style="font-size:12px;opacity:0.85;margin-top:4px;font-weight:400;">Недостаточно наличных</div>` : ''}
+      </button>
+      <button onclick="resolveTemptation(false)" class="secondary" style="text-align:left;padding:12px 14px;">
+        Воздержаться и сохранить деньги <span style="font-weight:400;font-size:13px;opacity:0.9;">(−10 настроения)</span>
+      </button>
+    </div>`;
+  return html;
+}
+
+function renderQuizCardHTML(data, isActive) {
+  const q = data.quiz;
+  if (!q) return '';
+  let html = `
+    <div style="font-size:12px;color:var(--blue);font-weight:700;letter-spacing:0.5px;margin-bottom:6px;">🎓 ВОПРОС · ${q.topic.toUpperCase()}</div>
+    <div style="font-size:16px;font-weight:600;margin-bottom:12px;">${q.question}</div>
+  `;
+  if (data.resolved) {
+    const isCorrect = data.answer === q.correct;
+    html += `<div class="result-box ${isCorrect ? 'good' : 'bad'}">
+      <div style="font-weight:700;margin-bottom:4px;">${isCorrect ? `✅ Правильно! +${CONFIG.quizBonus} ₽` : '❌ Не совсем'}</div>
+      <div>${q.explanation}</div>
+    </div>`;
+    if (isActive) {
+      html += `<button onclick="advancePhase()" style="width:100%;margin-top:12px;">Дальше →</button>`;
+    }
+    return html;
+  }
+  html += `<div style="display:flex;flex-direction:column;gap:8px;">`;
+  q.options.forEach((opt, i) => {
+    html += `<button onclick="answerQuiz(${i})" class="secondary" style="text-align:left;padding:12px 14px;line-height:1.4;">${opt}</button>`;
+  });
+  html += `</div><div class="muted" style="font-size:12px;margin-top:10px;">За правильный ответ: +${CONFIG.quizBonus} ₽</div>`;
+  return html;
+}
+
+function renderTaxCardHTML(data, isActive) {
+  const tax = data.tax;
+  if (!tax) return '';
+  const { eligible, refund } = tax;
+  let html = `
+    <div style="font-size:12px;color:var(--green);font-weight:700;letter-spacing:0.5px;margin-bottom:6px;">📋 НАЛОГОВЫЙ ВЫЧЕТ</div>
+    <div style="font-size:16px;font-weight:600;margin-bottom:10px;">Конец года — время вернуть часть налогов!</div>
+    <div style="font-size:14px;line-height:1.55;margin-bottom:12px;">
+      За год ты потратил <b>${fmt(eligible)} ₽</b> на обучение, спорт и медицину.
+      По закону ты можешь вернуть 13% от этой суммы — <b>${fmt(refund)} ₽</b>.
+    </div>
+  `;
+  if (data.resolved) {
+    if (data.decision === 'submit') {
+      html += `<div class="result-box good">✅ Отлично! Ты вернул ${fmt(refund)} ₽. Это твои же деньги — часть НДФЛ, которую ты заплатил с зарплаты. Вычет — законный способ уменьшить налоги.</div>`;
+    } else {
+      html += `<div class="result-box bad">Ты не подал на вычет и потерял ${fmt(refund)} ₽. Налоговый вычет — возврат части твоих же налогов. Не пользоваться им — значит переплачивать государству.</div>`;
+    }
+    if (isActive) {
+      html += `<button onclick="advancePhase()" style="width:100%;margin-top:12px;">Дальше →</button>`;
+    }
+    return html;
+  }
+  html += `<div style="display:flex;flex-direction:column;gap:8px;">
+    <button onclick="applyTaxSubmit()" class="success" style="text-align:left;padding:12px 14px;">✅ Подать на вычет → вернуть ${fmt(refund)} ₽</button>
+    <button onclick="applyTaxSkip()" class="secondary" style="text-align:left;padding:12px 14px;">Не подавать (забыть про вычет)</button>
+  </div>`;
+  return html;
+}
+
+function renderEndCard() {
+  let html = '';
+  if (state.cash > 0 && state.creditCard > 0) {
+    html += `
+      <div style="margin-bottom:14px;">
+        <div style="font-weight:600;margin-bottom:6px;">💳 Погасить часть кредитки?</div>
+        <div class="muted" style="font-size:13px;margin-bottom:10px;">Долг: ${fmt(state.creditCard)} ₽ · наличные: ${fmt(state.cash)} ₽</div>
+        <button onclick="payOffCredit()" class="secondary" style="width:100%;">Погасить ${fmt(Math.min(state.cash, state.creditCard))} ₽</button>
+      </div>
+    `;
+  }
+  html += `<button onclick="nextMonth()" style="width:100%;">${state.month >= CONFIG.totalMonths ? '🏁 Показать итоги' : 'Следующий месяц →'}</button>`;
+  return html;
+}
+
+function renderStart() {
+  return `
+    <div class="card fade-in" style="text-align:center;padding:32px 20px;">
+      <div style="font-size:clamp(48px,14vw,64px);margin-bottom:12px;line-height:1;">💰</div>
+      <h1>Жизнь на зарплату</h1>
+      <p class="muted" style="margin:14px 0 22px;font-size:14px;line-height:1.7;">
+        Тебе 18, ты устроился на первую работу.<br>
+        Зарплата <b>${fmt(CONFIG.salaryGross)} ₽</b>, но после налога — <b>${fmt(CONFIG.salaryGross * (1-CONFIG.ndfl))} ₽</b>.<br>
+        Проживи <b>${CONFIG.totalMonths} месяцев</b> и сохрани больше денег.
+      </p>
+      <div style="text-align:left;max-width:480px;margin:0 auto;background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:12px;padding:16px;">
+        <div style="font-size:13px;line-height:1.9;">
+          📋 НДФЛ: 13% удерживается с зарплаты<br>
+          🏠 Обязательные расходы: ${fmt(CONFIG.living)} ₽/мес<br>
+          🛡️ Страховка: ${fmt(CONFIG.insuranceCost)} ₽/мес (не покрывает мошенников и соблазны)<br>
+          😊 <b>Настроение:</b> старт 65%. Отказ от всех радостей ведёт к выгоранию. Если упадёт ниже 50% — импульсивные траты (но дают кратковременное облегчение).<br>
+        </div>
+      </div>
+      <button id="start-btn" style="margin-top:24px;padding:16px 40px;font-size:16px;">Начать игру</button>
+    </div>
+  `;
+}
+
+function renderSummary() {
+  const netWorth = state.cash - state.creditCard - state.microloan;
+  const totalDebt = state.creditCard + state.microloan;
+  let gradeEmoji, gradeText, gradeSub;
+  if (netWorth >= 80000 && totalDebt === 0) {
+    gradeEmoji = '🏆'; gradeText = 'Финансовый гений!'; gradeSub = 'Ты накопил подушку, не залез в долги и сохранил баланс.';
+  } else if (netWorth >= 40000 && totalDebt < 20000) {
+    gradeEmoji = '🎉'; gradeText = 'Отличный результат!'; gradeSub = 'Ты удержался на плаву и сохранил деньги.';
+  } else if (netWorth >= 0) {
+    gradeEmoji = '👍'; gradeText = 'Справился!'; gradeSub = 'Без больших накоплений, но и без серьёзных долгов.';
+  } else if (netWorth >= -30000) {
+    gradeEmoji = '😬'; gradeText = 'Долги тебя догнали'; gradeSub = 'Проценты и потери съели часть денег — стоит пересмотреть стратегию.';
+  } else {
+    gradeEmoji = '💀'; gradeText = 'Финансовая катастрофа'; gradeSub = 'Долги превысили доходы. Так выглядит долговая яма.';
+  }
+
+  return `
+    <div class="card fade-in">
+      <div class="grade">
+        <div class="grade-emoji">${gradeEmoji}</div>
+        <div class="grade-text">${gradeText}</div>
+        <div class="grade-sub">${gradeSub}</div>
+      </div>
+      <h2 style="margin-bottom:14px;">📊 Итоги за ${CONFIG.totalMonths} месяцев</h2>
+      <div class="result-row"><span>💵 Наличные на конец</span><span class="${state.cash >= 0 ? 'value-green' : 'value-red'}">${fmt(state.cash)} ₽</span></div>
+      <div class="result-row"><span>💳 Долг по кредитке</span><span class="${state.creditCard > 0 ? 'value-red' : ''}">${fmt(state.creditCard)} ₽</span></div>
+      <div class="result-row"><span>🏦 Долг по микрозайму</span><span class="${state.microloan > 0 ? 'value-red' : ''}">${fmt(state.microloan)} ₽</span></div>
+      <div class="result-row total"><span>📊 Итоговый капитал</span><span class="${netWorth >= 0 ? 'value-green' : 'value-red'}">${fmt(netWorth)} ₽</span></div>
+      
+      <h2 style="margin:22px 0 14px;">💰 Доходы и жизнь</h2>
+      <div class="result-row"><span>Зарплата начислена</span><span class="value-green">+${fmt(CONFIG.salaryGross * CONFIG.totalMonths)} ₽</span></div>
+      <div class="result-row"><span>📋 Удержан НДФЛ</span><span class="value-red">−${fmt(state.totalTaxPaid)} ₽</span></div>
+      ${state.totalTaxRefund > 0 ? `<div class="result-row"><span>✅ Возврат через вычет</span><span class="value-green">+${fmt(state.totalTaxRefund)} ₽</span></div>` : ''}
+      <div class="result-row"><span>Итоговое настроение</span><span class="${state.mood >= 50 ? 'value-green' : 'value-red'}">${state.mood}%</span></div>
+      
+      <h2 style="margin:22px 0 14px;">💸 Расходы</h2>
+      <div class="result-row"><span>Жильё, еда, транспорт</span><span class="value-red">−${fmt(CONFIG.living * CONFIG.totalMonths)} ₽</span></div>
+      <div class="result-row"><span>🛡️ Страховые взносы</span><span class="value-red">−${fmt(state.totalInsurance)} ₽</span></div>
+      <div class="result-row"><span>💳 Проценты по кредитке</span><span class="value-red">−${fmt(state.totalInterest)} ₽</span></div>
+      <div class="result-row"><span>🏦 Переплата по микрозаймам</span><span class="value-red">−${fmt(state.totalMicroloanOverpay)} ₽</span></div>
+      <div class="result-row"><span>🎯 Радости жизни (соблазны)</span><span class="value-red">−${fmt(state.totalTemptationSpent)} ₽</span></div>
+      ${state.totalFraudLoss > 0 ? `<div class="result-row"><span>⚠️ Потеряно на мошенниках</span><span class="value-red">−${fmt(state.totalFraudLoss)} ₽</span></div>` : ''}
+      ${state.totalOverCautiousLoss > 0 ? `<div class="result-row"><span>😬 Потеряно из-за излишней подозрительности</span><span class="value-red">−${fmt(state.totalOverCautiousLoss)} ₽</span></div>` : ''}
+      <div class="result-row"><span>🎓 Правильных ответов</span><span>${state.correctQuizzes} из ${state.totalQuizzes}</span></div>
+      
+      <div class="tip">
+        💡 <b>Главные уроки:</b><br>
+        ${state.totalFraudLoss > 0 ? `• <b>Доверчивость стоит дорого.</b> Ты потерял ${fmt(state.totalFraudLoss)} ₽ на мошенниках. Правило №1: никогда не сообщай коды из СМС, всегда проверяй через официальные приложения.<br>` : ''}
+        ${state.totalOverCautiousLoss > 0 ? `• <b>Излишняя подозрительность тоже стоит денег.</b> Ты потерял ${fmt(state.totalOverCautiousLoss)} ₽, отказавшись от легитимных вещей (курьер, мама, Госуслуги). Не всё подозрительное — мошенничество.<br>` : ''}
+        ${totalDebt > 30000 ? `• Долги по кредиткам и микрозаймам — самые дорогие деньги. Проценты съедают доход.<br>` : ''}
+        ${state.totalTaxRefund > 0 ? `• Ты использовал налоговый вычет и вернул ${fmt(state.totalTaxRefund)} ₽. Это законный способ сэкономить.<br>` : ''}
+        ${state.totalTemptationSpent > 0 ? `• Ты тратил на радости (${fmt(state.totalTemptationSpent)} ₽) — это нормально. Жить в постоянной экономии без маленьких удовольствий вредно для психики.<br>` : `• Ты старался не тратить на себя совсем. Это похвально, но полный отказ от радостей ведёт к выгоранию.<br>`}
+        <br><b>Помни:</b> подушка безопасности, критическое мышление и баланс между экономией и радостями — три кита финансового здоровья.
+      </div>
+      <button id="restart-btn" style="width:100%;margin-top:20px;padding:16px;">Играть снова</button>
+    </div>
+  `;
+}
+
+resetState();
+render();
+</script>
+</body>
+</html>
